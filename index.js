@@ -10,7 +10,41 @@ app.get("/health", (req, res) => {
 });
 
 // Helper function to call OpenAI API
-async function callOpenAI(model, prompt) {
+async function callOpenAI(model, nursingNote) {
+  const prompt = `
+You are a professional clinical documentation assistant.
+
+Rewrite the following nursing note into a structured clinical note with the following body system headings:
+- CNS
+- CVS
+- RESP
+- Endocrine
+- Hydration/Nutrition
+- GIT
+- Renal
+- Wounds
+- Integument
+- Mobility
+- Plan/Other (only if there are follow-up actions or plans)
+
+Rules:
+- Include ONLY the headings that have information in the note — do not add empty headings.
+- Write each section on a new line starting with the heading and a colon.
+- Use clear, professional, third-person, past-tense language.
+- Keep all medications, doses, times, vital signs, and interventions exactly as written.
+- Use concise sentences and correct nursing terminology.
+- Do NOT invent or add new information not present in the original note.
+
+Original Note:
+${nursingNote}
+
+Return ONLY the formatted note like this example:
+CNS: Pt alert & orientated. Nil C/O pain this shift.
+CVS: Obs stable and within normal parameters this shift. Maintained on room air.
+...
+Plan/Other: Rehab scheduled for tomorrow.
+`;
+
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -18,7 +52,7 @@ async function callOpenAI(model, prompt) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: model,
+      model,
       messages: [{ role: "system", content: prompt }],
     }),
   });
@@ -42,28 +76,16 @@ app.post("/polish", async (req, res) => {
       return res.status(400).json({ error: "Missing nursing_note in request body" });
     }
 
-    const prompt = `
-    You are a professional clinical documentation assistant.
-    Rewrite the following nursing note to be clear, concise, and professional.
-    - Keep all vitals, meds, times, and key interventions.
-    - Use third person, past tense.
-    - Structure: [Assessment] [Intervention] [Response] [Plan]
-    - Do not add new information not present in the original note.
-
-    Original Note:
-    ${nursingNote}
-    `;
-
     let data;
     let modelUsed = "gpt-4o-mini";
 
     try {
-      // First try GPT-4o-mini
-      data = await callOpenAI("gpt-4o-mini", prompt);
+      // First try gpt-4o-mini
+      data = await callOpenAI("gpt-4o-mini", nursingNote);
     } catch (err) {
       console.error("Primary model failed, falling back to gpt-3.5-turbo:", err.message);
       modelUsed = "gpt-3.5-turbo";
-      data = await callOpenAI("gpt-3.5-turbo", prompt);
+      data = await callOpenAI("gpt-3.5-turbo", nursingNote);
     }
 
     if (!data.choices || !data.choices.length) {
