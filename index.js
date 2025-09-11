@@ -59,7 +59,7 @@ app.post("/polish", async (req, res) => {
 
     try {
       // First attempt with gpt-4o-mini
-      data = await callOpenAI("gpt-4o-mini");
+      throw new Error("Simulated failure for testing fallback");
     } catch (err) {
       console.error("Primary model failed, falling back to gpt-3.5-turbo:", err.message);
       modelUsed = "gpt-3.5-turbo";
