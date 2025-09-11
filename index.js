@@ -4,9 +4,21 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "Middleware server is running" });
+});
+
 app.post("/polish", async (req, res) => {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is missing. Set it in Railway variables.");
+    }
+
     const nursingNote = req.body.nursing_note;
+    if (!nursingNote) {
+      return res.status(400).json({ error: "Missing nursing_note in request body" });
+    }
 
     const prompt = `
     You are a professional clinical documentation assistant.
@@ -24,20 +36,29 @@ app.post("/polish", async (req, res) => {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4",
-        messages: [{ role: "system", content: prompt }]
-      })
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: prompt }],
+      }),
     });
 
-    const data = await openaiResponse.json();
-    res.json({ polished_note: data.choices[0].message.content });
+    if (!openaiResponse.ok) {
+      const errorBody = await openaiResponse.text();
+      throw new Error(`OpenAI API error: ${openaiResponse.status} ${errorBody}`);
+    }
 
+    const data = await openaiResponse.json();
+
+    if (!data.choices || !data.choices.length) {
+      throw new Error("OpenAI API returned no choices");
+    }
+
+    res.json({ polished_note: data.choices[0].message.content });
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({ error: "Failed to polish note" });
+    res.status(500).json({ error: error.message || "Failed to polish note" });
   }
 });
 
