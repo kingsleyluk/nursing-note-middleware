@@ -32,30 +32,49 @@ app.post("/polish", async (req, res) => {
     ${nursingNote}
     `;
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "system", content: prompt }],
-      }),
-    });
+    // Helper function to call OpenAI API
+    async function callOpenAI(model) {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: prompt }],
+        }),
+      });
 
-    if (!openaiResponse.ok) {
-      const errorBody = await openaiResponse.text();
-      throw new Error(`OpenAI API error: ${openaiResponse.status} ${errorBody}`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`OpenAI API error (${model}): ${response.status} ${errorBody}`);
+      }
+
+      return response.json();
     }
 
-    const data = await openaiResponse.json();
+    let data;
+    let modelUsed = "gpt-4o-mini";
+
+    try {
+      // First attempt with gpt-4o-mini
+      data = await callOpenAI("gpt-4o-mini");
+    } catch (err) {
+      console.error("Primary model failed, falling back to gpt-3.5-turbo:", err.message);
+      modelUsed = "gpt-3.5-turbo";
+      data = await callOpenAI("gpt-3.5-turbo");
+    }
 
     if (!data.choices || !data.choices.length) {
       throw new Error("OpenAI API returned no choices");
     }
 
-    res.json({ polished_note: data.choices[0].message.content });
+    res.json({
+      polished_note: data.choices[0].message.content,
+      model_used: modelUsed,
+    });
+
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ error: error.message || "Failed to polish note" });
