@@ -9,10 +9,32 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Middleware server is running" });
 });
 
+// Helper function to call OpenAI API
+async function callOpenAI(model, prompt) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [{ role: "system", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
+  }
+
+  return response.json();
+}
+
 app.post("/polish", async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is missing. Set it in Railway variables.");
+      return res.status(500).json({ error: "OPENAI_API_KEY is missing. Set it in Railway variables." });
     }
 
     const nursingNote = req.body.nursing_note;
@@ -32,38 +54,16 @@ app.post("/polish", async (req, res) => {
     ${nursingNote}
     `;
 
-    // Helper function to call OpenAI API
-    async function callOpenAI(model) {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: prompt }],
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`OpenAI API error (${model}): ${response.status} ${errorBody}`);
-      }
-
-      return response.json();
-    }
-
     let data;
     let modelUsed = "gpt-4o-mini";
 
     try {
-      // First attempt with gpt-4o-mini
-      throw new Error("Simulated failure for testing fallback");
+      // First try GPT-4o-mini
+      data = await callOpenAI("gpt-4o-mini", prompt);
     } catch (err) {
       console.error("Primary model failed, falling back to gpt-3.5-turbo:", err.message);
       modelUsed = "gpt-3.5-turbo";
-      data = await callOpenAI("gpt-3.5-turbo");
+      data = await callOpenAI("gpt-3.5-turbo", prompt);
     }
 
     if (!data.choices || !data.choices.length) {
