@@ -9,23 +9,23 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Middleware server is running" });
 });
 
-// Helper function to call OpenAI API with a specific model
+// Helper function to call OpenAI
 async function callOpenAI(model, nursingNote) {
   const prompt = `
 You are a professional clinical documentation assistant.
-Rewrite the following nursing note into a clear, concise, and professional format.
+Rewrite the following nursing note into a clean, concise, professional format.
 
-Requirements:
-- Use the following section headings **only if data exists in the note**:
-  CNS, CVS, RESP, Endocrine, Hydration/Nutrition, GIT, Renal, Wounds, Integument, Mobility, Plan/Other.
-- Do NOT invent or add data that is not present in the original note.
-- Write in third person, past tense.
-- Keep all vitals, meds, times, and interventions.
-- Each heading should be on a new line followed by a colon and its content.
+Rules:
+- **Keep nursing shorthand exactly as written** (e.g., BO ×1, NBM, SpO₂, Pt, C/O).
+- Maintain all vitals, times, meds, interventions.
+- Use headings: CNS, CVS, RESP, Endocrine, Hydration/Nutrition, GIT, Renal, Wounds, Integument, Mobility, Plan/Other.
+- Only include headings that have data (omit empty ones).
+- Do not add information not present in the original note.
+- Output must follow heading format exactly as shown above.
 
 Original Note:
 ${nursingNote}
-`;
+  `;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -34,7 +34,7 @@ ${nursingNote}
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: model,
+      model,
       messages: [{ role: "system", content: prompt }],
     }),
   });
@@ -47,11 +47,10 @@ ${nursingNote}
   return response.json();
 }
 
-// Main polish endpoint
 app.post("/polish", async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is missing. Set it in Railway variables.");
+      return res.status(500).json({ error: "OPENAI_API_KEY missing." });
     }
 
     const nursingNote = req.body.nursing_note;
@@ -63,10 +62,9 @@ app.post("/polish", async (req, res) => {
     let modelUsed = "gpt-4o-mini";
 
     try {
-      // First attempt with gpt-4o-mini
       data = await callOpenAI("gpt-4o-mini", nursingNote);
     } catch (err) {
-      console.error("Primary model failed, falling back to gpt-3.5-turbo:", err.message);
+      console.error("gpt-4o-mini failed, falling back to gpt-3.5-turbo:", err.message);
       modelUsed = "gpt-3.5-turbo";
       data = await callOpenAI("gpt-3.5-turbo", nursingNote);
     }
