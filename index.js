@@ -17,21 +17,11 @@ Rewrite the following nursing note into a clean, concise, professional format.
 
 Rules:
 - Keep nursing shorthand exactly as written (e.g., BO ×1, NBM, SpO₂, Pt, C/O).
-- Maintain all vitals, times, meds, and interventions.
+- Maintain all vitals, times, meds, interventions.
 - Use headings: CNS, CVS, RESP, Endocrine, Hydration/Nutrition, GIT, Renal, Wounds, Integument, Mobility, Plan/Other.
 - Only include headings that have data (omit empty ones).
 - Do not add information not present in the original note.
-- Correct awkward fragments like "Pt tolerated food & fluid minimal" into "Pt tolerated minimal food & fluid" (or equivalent proper English order).
 - Output must follow heading format exactly as shown above.
-- Combine duplicate information (e.g. pain score mentioned twice → document once).
-- Remove headings where no information is present (instead of writing "no details" or "irrelevant").
-- Simplify language to standard nursing note style: short, clear, action-oriented.
-- Merge duplicate pain information into one concise line (include score, medication, and effect).
-- Remove redundant phrases if already stated under another heading (e.g., oral intake, encouragement).
-- Rephrase awkward or incomplete phrases (e.g., "output adequate: undefined" → remove).
-- Use standard nursing abbreviations where appropriate (BNO ×3 days, FBC, etc.).
-- Keep sentences short, structured, and action-oriented.
-
 
 Original Note:
 ${nursingNote}
@@ -46,7 +36,6 @@ ${nursingNote}
     body: JSON.stringify({
       model,
       messages: [{ role: "system", content: prompt }],
-      temperature: 0.2, // keep output consistent
     }),
   });
 
@@ -58,6 +47,7 @@ ${nursingNote}
   return response.json();
 }
 
+// Polish endpoint
 app.post("/polish", async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -69,8 +59,6 @@ app.post("/polish", async (req, res) => {
       return res.status(400).json({ error: "Missing nursing_note in request body" });
     }
 
-    console.log("🟡 RAW NOTE:", nursingNote);
-
     let data;
     let modelUsed = "gpt-4o-mini";
 
@@ -79,31 +67,20 @@ app.post("/polish", async (req, res) => {
     } catch (err) {
       console.error("⚠️ gpt-4o-mini failed, falling back to gpt-3.5-turbo:", err.message);
       modelUsed = "gpt-3.5-turbo";
-
-      try {
-        data = await callOpenAI("gpt-3.5-turbo", nursingNote);
-      } catch (fallbackErr) {
-        console.error("❌ Fallback model also failed:", fallbackErr.message);
-        console.warn("Returning raw note as fallback to avoid blocking Base44.");
-        return res.json({ polished_note: nursingNote, model_used: "raw_fallback" });
-      }
+      data = await callOpenAI("gpt-3.5-turbo", nursingNote);
     }
 
     if (!data.choices || !data.choices.length) {
-      console.warn("⚠️ OpenAI returned no choices. Returning raw note.");
-      return res.json({ polished_note: nursingNote, model_used: "raw_fallback" });
+      throw new Error("OpenAI API returned no choices");
     }
 
-    const polishedNote = data.choices[0].message.content.trim();
-    console.log("🟢 POLISHED NOTE:", polishedNote);
-
     res.json({
-      polished_note: polishedNote,
+      polished_note: data.choices[0].message.content,
       model_used: modelUsed,
     });
   } catch (error) {
-    console.error("❌ Unhandled error:", error.message || error);
-    res.json({ polished_note: req.body.nursing_note, model_used: "raw_fallback" });
+    console.error("❌ Error:", error.message || error);
+    res.status(500).json({ error: error.message || "Failed to polish note" });
   }
 });
 
