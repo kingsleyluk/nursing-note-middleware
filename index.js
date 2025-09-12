@@ -26,6 +26,12 @@ Rules:
 - Combine duplicate information (e.g. pain score mentioned twice → document once).
 - Remove headings where no information is present (instead of writing "no details" or "irrelevant").
 - Simplify language to standard nursing note style: short, clear, action-oriented.
+- Merge duplicate pain information into one concise line (include score, medication, and effect).
+- Remove redundant phrases if already stated under another heading (e.g., oral intake, encouragement).
+- Rephrase awkward or incomplete phrases (e.g., "output adequate: undefined" → remove).
+- Use standard nursing abbreviations where appropriate (BNO ×3 days, FBC, etc.).
+- Keep sentences short, structured, and action-oriented.
+
 
 Original Note:
 ${nursingNote}
