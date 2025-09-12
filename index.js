@@ -23,6 +23,9 @@ Rules:
 - Do not add information not present in the original note.
 - Correct awkward fragments like "Pt tolerated food & fluid minimal" into "Pt tolerated minimal food & fluid" (or equivalent proper English order).
 - Output must follow heading format exactly as shown above.
+- Combine duplicate information (e.g. pain score mentioned twice → document once).
+- Remove headings where no information is present (instead of writing "no details" or "irrelevant").
+- Simplify language to standard nursing note style: short, clear, action-oriented.
 
 Original Note:
 ${nursingNote}
