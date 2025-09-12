@@ -21,6 +21,7 @@ Rules:
 - Use headings: CNS, CVS, RESP, Endocrine, Hydration/Nutrition, GIT, Renal, Wounds, Integument, Mobility, Plan/Other.
 - Only include headings that have data (omit empty ones).
 - Do not add information not present in the original note.
+- Correct awkward fragments like "Pt tolerated food & fluid minimal" into "Pt tolerated minimal food & fluid" (or equivalent proper English order).
 - Output must follow heading format exactly as shown above.
 
 Original Note:
@@ -36,7 +37,7 @@ ${nursingNote}
     body: JSON.stringify({
       model,
       messages: [{ role: "system", content: prompt }],
-      temperature: 0.2, // keeps output consistent and stable
+      temperature: 0.2, // keep output consistent
     }),
   });
 
@@ -93,7 +94,6 @@ app.post("/polish", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Unhandled error:", error.message || error);
-    // Final fallback: return raw note so Base44 isn't blocked
     res.json({ polished_note: req.body.nursing_note, model_used: "raw_fallback" });
   }
 });
