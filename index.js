@@ -9,6 +9,36 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Middleware server is running" });
 });
 
+// Helper: apply PICC line formatting
+function applyPICCFormatting(note) {
+  if (!note) return note;
+
+  // Regex to find PICC line sentences (very flexible)
+  return note.replace(
+    /PICC.*?(?:in[-\s]?situ)?.*?(?:\n|$)/gi,
+    (match) => {
+      // Try to extract lumens count (1, 2, 3...) if mentioned
+      const lumenMatch = match.match(/(\d+)\s*lumens?/i);
+      const lumens = lumenMatch ? `X${lumenMatch[1]} lumens` : "";
+
+      // Extract any free text after lumens
+      let details = match
+        .replace(/PICC.*?(in[-\s]?situ)?/i, "")
+        .replace(/(\d+\s*lumens?)/i, "")
+        .replace(/this shift.?/i, "")
+        .trim();
+
+      // Build final formatted line
+      let formatted = `PICC line in situ`;
+      if (lumens) formatted += `, ${lumens}`;
+      if (details) formatted += ` ${details}`;
+      formatted += ` this shift.`;
+
+      return formatted;
+    }
+  );
+}
+
 // Helper function to call OpenAI
 async function callOpenAI(model, nursingNote) {
   const prompt = `
@@ -74,8 +104,13 @@ app.post("/polish", async (req, res) => {
       throw new Error("OpenAI API returned no choices");
     }
 
+    let polishedNote = data.choices[0].message.content;
+
+    // ✅ Apply PICC rule here
+    polishedNote = applyPICCFormatting(polishedNote);
+
     res.json({
-      polished_note: data.choices[0].message.content,
+      polished_note: polishedNote,
       model_used: modelUsed,
     });
   } catch (error) {
