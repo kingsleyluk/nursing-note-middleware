@@ -1,7 +1,16 @@
 import express from "express";
 import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
+
+// ✅ Enable CORS for all origins (safe for testing)
+app.use(cors({
+  origin: "*", // or replace with "https://your-base44-app-domain" for more security
+  methods: ["POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Accept"],
+}));
+
 app.use(express.json());
 
 // Health check endpoint
@@ -13,7 +22,6 @@ app.get("/health", (req, res) => {
 function applyPICCFormatting(note) {
   if (!note) return note;
 
-  // Regex to find PICC line sentences (very flexible)
   return note.replace(
     /PICC.*?(?:in[-\s]?situ)?.*?(?:\n|$)/gi,
     (match) => {
@@ -28,7 +36,6 @@ function applyPICCFormatting(note) {
         .replace(/this shift.?/i, "")
         .trim();
 
-      // Build final formatted line
       let formatted = `PICC line in situ`;
       if (lumens) formatted += `, ${lumens}`;
       if (details) formatted += ` ${details}`;
@@ -42,16 +49,15 @@ function applyPICCFormatting(note) {
 // Helper function to call OpenAI
 async function callOpenAI(model, nursingNote) {
   const prompt = `
-You are a professional clinical documentation assistant.
-Rewrite the following nursing note into a clean, concise, professional format.
+You are a grammar correction assistant for clinical nursing notes.
+Correct only grammar, spelling, and punctuation issues in the following note.
 
 Rules:
-- Keep nursing shorthand exactly as written (e.g., BO ×1, NBM, SpO₂, Pt, C/O).
-- Maintain all vitals, times, meds, interventions.
-- Use headings: CNS, CVS, RESP, Endocrine, Hydration/Nutrition, GIT, Renal, Wounds, Integument, Mobility, Plan/Other.
-- Only include headings that have data (omit empty ones).
-- Do not add information not present in the original note.
-- Output must follow heading format exactly as shown above.
+- Do NOT rephrase or rewrite sentences if they are already clear.
+- Do NOT change clinical terminology or shorthand (e.g., BO ×1, NBM, SpO₂, Pt, C/O).
+- Do NOT add or remove any clinical information.
+- Keep the same headings and structure as provided.
+- Return the note with minimal changes, just fixing grammar/typos.
 
 Original Note:
 ${nursingNote}
@@ -79,6 +85,8 @@ ${nursingNote}
 
 // Polish endpoint
 app.post("/polish", async (req, res) => {
+  console.log("📥 Incoming request to /polish:", req.body); // helpful for debugging
+
   try {
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ error: "OPENAI_API_KEY missing." });
@@ -106,7 +114,7 @@ app.post("/polish", async (req, res) => {
 
     let polishedNote = data.choices[0].message.content;
 
-    // ✅ Apply PICC rule here
+    // ✅ Apply PICC rule
     polishedNote = applyPICCFormatting(polishedNote);
 
     res.json({
